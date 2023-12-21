@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>chat</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <link rel="icon" href="logo.png" type="image/x-icon">
+  <style>
+    html {
+      height: 100%;
+    }
+
+    body {
+      margin: 0;
+      height: 100%;
+      background-color: #282c34;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    }
+
+    #chatContainer {
+      height: calc(100% - 35px);
+      overflow-y: scroll;
+      overflow-x: auto;
+    }
+
+    #inputContainer {
+      height: 35px;
+      display: flex;
+    }
+
+    #input {
+      border: 0;
+      padding: 0;
+      height: calc(100% - 10px);
+      flex-grow: 1;
+      outline: 0;
+      resize: none;
+      padding: 5px;
+      font-size: 18px;
+      background-color: #1e2027;
+      color: #ffffff;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    }
+
+    #send {
+      height: calc(100% - 10px);
+      width: 100px;
+      background-color: #66b2f0;
+      padding: 5px;
+      text-align: center;
+      font-size: 18px;
+      color: #ffffff;
+      cursor: pointer;
+    }
+
+    .message {
+      padding: 5px;
+      display: block;
+      color: #a9a9a9;
+      font-size: 18px;
+    }
+
+    .sent {
+      color: #ffffff;
+    }
+
+    .joined {
+      color: #66b2f0;
+    }
+
+    .left {
+      color: #ff0000;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="chatContainer">
+    <div id="chat"></div>
+  </div>
+  <div id="inputContainer">
+    <textarea id="input" title="input"></textarea>
+    <div id="send">send</div>
+  </div>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.6.0/firebase-app.js";
+    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.6.0/firebase-auth.js";
+    import { getDatabase, ref, set, onDisconnect, onChildAdded, onChildRemoved, onValue } from "https://www.gstatic.com/firebasejs/10.6.0/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBRYKhbqG4VowjguUudHa7319kQSRrF3dU",
+      authDomain: "project-8366590281187213032.firebaseapp.com",
+      databaseURL: "https://project-8366590281187213032-default-rtdb.firebaseio.com",
+      projectId: "project-8366590281187213032",
+      storageBucket: "project-8366590281187213032.appspot.com",
+      messagingSenderId: "837487724620",
+      appId: "1:837487724620:web:db5aac6fe4af8d8c234ce9"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const auth = getAuth();
+
+    signInAnonymously(auth).catch(error => {
+      const errorCode = error.code;
+      const errorMessage = error.message;
+      console.log('error: ', errorMessage);
+    });
+
+    let userId;
+    let userRef;
+    let userName;
+
+    onAuthStateChanged(auth, user => {
+      if (user) {
+        userName = prompt('name: ', '');
+        if (userName == null) userName = 'nullptr';
+        userId = user.uid;
+        userRef = ref(db, 'users/' + userId);
+        set(userRef, {
+          id: userId,
+          name: userName,
+          sent: false,
+          message: ''
+        });
+        onDisconnect(userRef).remove();
+        updateUsers();
+      }
+    });
+
+    function updateUsers() {
+      let usersRef = ref(db, 'users');
+
+      onChildAdded(usersRef, snapshot => {
+        document.querySelector('#chat').innerHTML += '<span class="message">' + snapshot.val().name + '<span class="joined"> joined</span></span>';
+        document.querySelector('#chat').scrollIntoView({ behavior: "smooth", block: "end" });
+      });
+
+      onChildRemoved(usersRef, snapshot => {
+        document.querySelector('#chat').innerHTML += '<span class="message">' + snapshot.val().name + '<span class="left"> left</span></span>';
+        document.querySelector('#chat').scrollIntoView({ behavior: "smooth", block: "end" });
+      });
+
+      onValue(usersRef, snapshot => {
+        for (let i = 0; i < Object.values(snapshot.val()).length; i++) {
+          if (Object.values(snapshot.val())[i].sent) {
+            document.querySelector('#chat').innerHTML += '<span class="message">' + Object.values(snapshot.val())[i].name + '<span class="sent"> ' + Object.values(snapshot.val())[i].message + '</span></span>';
+            document.querySelector('#chat').scrollIntoView({ behavior: "smooth", block: "end" });
+            if (Object.values(snapshot.val())[i].id === userId) {
+              set(userRef, {
+                id: userId,
+                name: userName,
+                sent: false,
+                message: ''
+              });
+            }
+          }
+        }
+      });
+    }
+
+    document.querySelector('#send').addEventListener("click", send);
+    document.onkeydown = e => {
+      if (event.keyCode == '13') {
+        event.preventDefault();
+        send();
+      }
+    }
+
+    function send() {
+      if (document.querySelector('#input').value != '') {
+        set(userRef, {
+          id: userId,
+          name: userName,
+          sent: true,
+          message: document.querySelector('#input').value
+        });
+        document.querySelector('#input').value = '';
+      }
+    }
+  </script>
+</body>
+
+</html>
